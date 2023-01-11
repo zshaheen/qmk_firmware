@@ -17,6 +17,16 @@
 #pragma once
 
 #ifdef RGB_MATRIX_ENABLE
+/* My changes. */
+#    define RGB_MATRIX_MAXIMUM_BRIGHTNESS 255
+#    define MK_3_SPEED
+#    define MK_C_OFFSET_0 4
+#    define MK_C_INTERVAL_0 16
+#    define MK_C_OFFSET_1 8
+#    define MK_C_INTERVAL_1 16
+#    define MK_C_OFFSET_2 12
+#    define MK_C_INTERVAL_2 16
+
 /* RGB Matrix driver configuration */
 #    define DRIVER_COUNT 2
 
