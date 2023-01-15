@@ -26,6 +26,8 @@
 #    define MK_C_INTERVAL_1 16
 #    define MK_C_OFFSET_2 12
 #    define MK_C_INTERVAL_2 16
+#    define MK_W_OFFSET_2 1
+#    define MK_W_INTERVAL_2 60
 
 /* RGB Matrix driver configuration */
 #    define DRIVER_COUNT 2
