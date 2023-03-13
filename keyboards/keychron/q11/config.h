@@ -78,7 +78,7 @@
 #define ENCODER_DEFAULT_POS 0x3
 
 /* Disable RGB lighting when PC is in suspend */
-#define RGB_DISABLE_WHEN_USB_SUSPENDED
+// #define RGB_DISABLE_WHEN_USB_SUSPENDED
 
 /* Specifed (0,1) which programmed "ESC" key on this keyboard as bootmagic key */
 #define BOOTMAGIC_LITE_ROW 0
