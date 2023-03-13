@@ -431,12 +431,6 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
             dynamic_keymap_set_buffer(offset, size, &command_data[3]);
             break;
         }
-#ifdef RAW_HID_CMD
-        case RAW_HID_CMD: {
-            via_custom_value_command_kb(data, length);
-            return;
-        }
-#endif
 #ifdef ENCODER_MAP_ENABLE
         case id_dynamic_keymap_get_encoder: {
             uint16_t keycode = dynamic_keymap_get_encoder(command_data[0], command_data[1], command_data[2] != 0);
@@ -710,11 +704,11 @@ void via_qmk_rgb_matrix_set_value(uint8_t *data) {
             break;
         }
         case id_qmk_rgb_matrix_effect_speed: {
-            rgblight_set_speed_noeeprom(value_data[0]);
+            rgb_matrix_set_speed_noeeprom(value_data[0]);
             break;
         }
         case id_qmk_rgb_matrix_color: {
-            rgblight_sethsv_noeeprom(value_data[0], value_data[1], rgb_matrix_get_val());
+            rgb_matrix_sethsv_noeeprom(value_data[0], value_data[1], rgb_matrix_get_val());
             break;
         }
     }

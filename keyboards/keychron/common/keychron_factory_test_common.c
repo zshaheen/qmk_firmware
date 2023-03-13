@@ -15,10 +15,11 @@
  */
 
 #include QMK_KEYBOARD_H
-#include "keycode.h"
-#include "quantum_keycodes.h"
-#include "via.h"
+
 #include "raw_hid.h"
+#if defined(KEYBOARD_keychron_q11_q11_ansi_stm32l432_ec11)
+#    include "split_util.h"
+#endif
 
 #define KEY_PRESS_FN     (0x1<<0)
 #define KEY_PRESS_STEP_1 (0x1<<1)
@@ -94,6 +95,14 @@
 #    define KC_STEP_6 KC_M
 #    define KC_STEP_7 KC_RIGHT
 #    define KC_STEP_8 KC_HOME
+#    define KC_STEP_9 KC_J
+#    define KC_STEP_A KC_Z
+#    ifdef RGB_MATRIX_ENABLE
+        static uint8_t led_state = 0;
+        static uint8_t light_test_state = 0;
+        HSV hsv;
+#    endif
+static bool skip_next_step = false;
 #elif defined(KEYBOARD_keychron_q60_q60_ansi_stm32l432)
 #    define FN1 1
 #    define FN2 2
@@ -293,7 +302,22 @@ bool process_record_ft(uint16_t keycode, keyrecord_t *record) {
             return true;
         case KC_STEP_1:
 #if defined(KEYBOARD_keychron_q11_q11_ansi_stm32l432_ec11)
+            if (is_transport_connected() || !is_keyboard_left()) {
+                return true;
+            } else {
+                skip_next_step = true;
+            }
         case KC_STEP_5:
+            if ((is_transport_connected() || is_keyboard_left()) && !skip_next_step) {
+                return true;
+            } else {
+                skip_next_step = true;
+            }
+        case KC_STEP_9:
+            if (!is_transport_connected() && !skip_next_step) {
+                return true;
+            }
+            skip_next_step = false;
 #endif // KEYBOARD_keychron_q11_q11_ansi_stm32l432_ec11
             if (record->event.pressed) {
                 key_press_status |= KEY_PRESS_STEP_1;
@@ -307,7 +331,22 @@ bool process_record_ft(uint16_t keycode, keyrecord_t *record) {
             return true;
         case KC_STEP_2:
 #if defined(KEYBOARD_keychron_q11_q11_ansi_stm32l432_ec11)
+            if (is_transport_connected() || !is_keyboard_left()) {
+                return true;
+            } else {
+                skip_next_step = true;
+            }
         case KC_STEP_6:
+            if ((is_transport_connected() || is_keyboard_left()) && !skip_next_step) {
+                return true;
+            } else {
+                skip_next_step = true;
+            }
+        case KC_STEP_A:
+            if (!is_transport_connected() && !skip_next_step) {
+                return true;
+            }
+            skip_next_step = false;
 #endif // KEYBOARD_keychron_q11_q11_ansi_stm32l432_ec11
             if (record->event.pressed) {
                 key_press_status |= KEY_PRESS_STEP_2;
@@ -345,7 +384,15 @@ bool process_record_ft(uint16_t keycode, keyrecord_t *record) {
                 key_press_status |= KEY_PRESS_STEP_4;
                 if (led_test_mode) {
                     led_test_mode = LED_TEST_MODE_OFF;
+#if defined(KEYBOARD_keychron_q11_q11_ansi_stm32l432_ec11) && defined(RGB_MATRIX_ENABLE)
+                    rgb_matrix_mode_noeeprom(led_state);
+                    rgb_matrix_sethsv_noeeprom(hsv.h, hsv.s, hsv.v);
+#endif
                 } else if (key_press_status == KEY_PRESS_LED_TEST) {
+#if defined(KEYBOARD_keychron_q11_q11_ansi_stm32l432_ec11) && defined(RGB_MATRIX_ENABLE)
+                    led_state = rgb_matrix_get_mode();
+                    hsv = rgb_matrix_get_hsv();
+#endif
                     timer_3s_buffer = sync_timer_read32();
                 }
             } else {
@@ -377,6 +424,11 @@ static void factory_reset(void) {
         rgb_matrix_enable();
     }
     rgb_matrix_init();
+#    if defined(KEYBOARD_keychron_q11_q11_ansi_stm32l432_ec11)  && defined(RGB_MATRIX_ENABLE)
+    led_state = rgb_matrix_get_mode();
+    hsv = rgb_matrix_get_hsv();
+    rgb_matrix_mode_noeeprom(RGB_MATRIX_SOLID_COLOR);
+#    endif
 #endif
 }
 
@@ -386,6 +438,9 @@ static void timer_3s_task(void) {
         if (key_press_status == KEY_PRESS_FACTORY_RESET) {
             factory_reset();
         } else if (key_press_status == KEY_PRESS_LED_TEST) {
+#if defined(KEYBOARD_keychron_q11_q11_ansi_stm32l432_ec11) && defined(RGB_MATRIX_ENABLE)
+            rgb_matrix_mode_noeeprom(RGB_MATRIX_SOLID_COLOR);
+#endif
             led_test_mode = LED_TEST_MODE_WHITE;
 #ifdef LED_MATRIX_ENABLE
             if (!led_matrix_is_enabled()) {
@@ -407,6 +462,10 @@ static void timer_300ms_task(void) {
         if (factory_reset_count++ > 6) {
             timer_300ms_buffer = 0;
             factory_reset_count = 0;
+#if defined(KEYBOARD_keychron_q11_q11_ansi_stm32l432_ec11) && defined(RGB_MATRIX_ENABLE)
+            rgb_matrix_mode_noeeprom(led_state);
+            rgb_matrix_sethsv_noeeprom(hsv.h, hsv.s, hsv.v);
+#endif
         } else {
             timer_300ms_buffer = sync_timer_read32();
         }
@@ -427,29 +486,53 @@ bool led_matrix_indicators_advanced_ft(uint8_t led_min, uint8_t led_max) {
 #ifdef RGB_MATRIX_ENABLE
 bool rgb_matrix_indicators_advanced_ft(uint8_t led_min, uint8_t led_max) {
     if (factory_reset_count) {
-        for (uint8_t i = led_min; i <= led_max; i++) {
-            rgb_matrix_set_color(i, factory_reset_count % 2 ? 0 : RGB_RED);
+        if (rgb_matrix_get_mode() == RGB_MATRIX_SOLID_COLOR) {
+            if (factory_reset_count % 2) {
+                rgb_matrix_sethsv_noeeprom(HSV_RED);
+            } else {
+                rgb_matrix_sethsv_noeeprom(HSV_OFF);
+            }
+        } else {
+            for (uint8_t i = led_min; i <= led_max; i++) {
+                rgb_matrix_set_color(i, factory_reset_count % 2 ? 0 : RGB_RED);
+            }
         }
     } else if (led_test_mode) {
         switch (led_test_mode) {
             case LED_TEST_MODE_WHITE:
-                for (uint8_t i = led_min; i <= led_max; i++) {
-                    rgb_matrix_set_color(i, RGB_WHITE);
+                if (rgb_matrix_get_mode() == RGB_MATRIX_SOLID_COLOR) {
+                    rgb_matrix_sethsv_noeeprom(HSV_WHITE);
+                } else {
+                    for (uint8_t i = led_min; i <= led_max; i++) {
+                        rgb_matrix_set_color(i, RGB_WHITE);
+                    }
                 }
                 break;
             case LED_TEST_MODE_RED:
-                for (uint8_t i = led_min; i <= led_max; i++) {
-                    rgb_matrix_set_color(i, RGB_RED);
+                if (rgb_matrix_get_mode() == RGB_MATRIX_SOLID_COLOR) {
+                    rgb_matrix_sethsv_noeeprom(HSV_RED);
+                } else {
+                    for (uint8_t i = led_min; i <= led_max; i++) {
+                        rgb_matrix_set_color(i, RGB_RED);
+                    }
                 }
                 break;
             case LED_TEST_MODE_GREEN:
-                for (uint8_t i = led_min; i <= led_max; i++) {
-                    rgb_matrix_set_color(i, RGB_GREEN);
+                if (rgb_matrix_get_mode() == RGB_MATRIX_SOLID_COLOR) {
+                    rgb_matrix_sethsv_noeeprom(HSV_GREEN);
+                } else {
+                    for (uint8_t i = led_min; i <= led_max; i++) {
+                        rgb_matrix_set_color(i, RGB_GREEN);
+                    }
                 }
                 break;
             case LED_TEST_MODE_BLUE:
-                for (uint8_t i = led_min; i <= led_max; i++) {
-                    rgb_matrix_set_color(i, RGB_BLUE);
+                if (rgb_matrix_get_mode() == RGB_MATRIX_SOLID_COLOR) {
+                    rgb_matrix_sethsv_noeeprom(HSV_BLUE);
+                } else {
+                    for (uint8_t i = led_min; i <= led_max; i++) {
+                        rgb_matrix_set_color(i, RGB_BLUE);
+                    }
                 }
                 break;
             default:
@@ -469,6 +552,7 @@ void housekeeping_task_ft(void) {
     }
 }
 
+#ifdef DIP_SWITCH_ENABLE
 static void system_switch_state_report(uint8_t index, bool active) {
     uint16_t checksum = 0;
     uint8_t data[RAW_EPSIZE] = {0};
@@ -498,8 +582,9 @@ bool dip_switch_update_ft(uint8_t index, bool active) {
     system_switch_state_report(index, active);
     return true;
 }
+#endif // DIP_SWITCH_ENABLE
 
-void via_custom_value_command_kb(uint8_t *data, uint8_t length) {
+bool via_command_kb(uint8_t *data, uint8_t length) {
     if (data[0] == 0xAB) {
         uint16_t checksum = 0;
         for (uint8_t i = 1; i < RAW_EPSIZE - 3; i++) {
@@ -507,11 +592,27 @@ void via_custom_value_command_kb(uint8_t *data, uint8_t length) {
         }
         /* Verify checksum */
         if ((checksum & 0xFF) != data[RAW_EPSIZE - 2] || checksum >> 8 != data[RAW_EPSIZE - 1]) {
-            return;
+            return true;
         }
         switch (data[1]) {
             case FACTORY_TEST_CMD_BACKLIGHT:
-                led_test_mode   = data[2];
+                led_test_mode = data[2];
+#if defined(KEYBOARD_keychron_q11_q11_ansi_stm32l432_ec11) && defined(RGB_MATRIX_ENABLE)
+                if (led_test_mode) {
+                    light_test_state += 1;
+                    if (light_test_state == 1) {
+                        led_state = rgb_matrix_get_mode();
+                        hsv = rgb_matrix_get_hsv();
+                    }
+                    rgb_matrix_mode_noeeprom(RGB_MATRIX_SOLID_COLOR);
+                } else {
+                    if (light_test_state) {
+                        light_test_state = 0;
+                        rgb_matrix_mode_noeeprom(led_state);
+                        rgb_matrix_sethsv_noeeprom(hsv.h, hsv.s, hsv.v);
+                    }
+                }
+#endif
                 timer_3s_buffer = 0;
                 break;
             case FACTORY_TEST_CMD_OS_SWITCH:
@@ -533,5 +634,13 @@ void via_custom_value_command_kb(uint8_t *data, uint8_t length) {
                 }
                 break;
         }
+        return true;
     }
+    return false;
 }
+
+#if defined(MCU) && (MCU == STM32L432)
+void restart_usb_driver(USBDriver *usbp) {
+    (void)usbp;
+}
+#endif
